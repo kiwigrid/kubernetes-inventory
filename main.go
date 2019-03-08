@@ -1,19 +1,74 @@
 package main
 
 import (
+	"flag"
 	"github.com/Sirupsen/logrus"
+	"github.com/kiwigrid/kubernetes-inventory/types"
+	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"os"
+	"path/filepath"
 )
 
 var VERSION = "latest"
+var namespace = ""
 
 func main() {
-	clientset, err := getClient("")
-	clientset.CoreV1().Pods("").Get("", metav1.GetOptions{})
+
+	var kubeconfig *string
+	if home := homeDir(); home != "" {
+		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	} else {
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	}
+	flag.Parse()
+
+	// use the current context in kubeconfig
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	// create the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	
+	deploymentList, _ := clientset.ExtensionsV1beta1().Deployments(namespace).List(metav1.ListOptions{})
+
+	containerList := []types.ContainerInventory{}
+
+	for _, deployment := range deploymentList.Items {
+		//logrus.Infof("%v", deployment)
+		for _, container := range deployment.Spec.Template.Spec.Containers {
+
+			chart, rel := getHelmMetadata(&deployment)
+
+			ctn := &types.ContainerInventory{
+				ContainerName:        container.Name,
+				DeploymentName:       deployment.Name,
+				HelmChart:            chart,
+				HelmReleaseName:      rel,
+				ReplicaCount:         int(*deployment.Spec.Replicas),
+				ResourceCpuRequested: container.Resources.Requests.Cpu().String(),
+				ResourceMemRequested: container.Resources.Requests.Memory().String(),
+				ResourceCpuLimit:     container.Resources.Limits.Cpu().String(),
+				ResourceMemLimit:     container.Resources.Limits.Memory().String(),
+				UpdateStrategy:       deployment.Spec.Strategy.String(),
+				PodDisruptionBudget:  false,
+				Affinity:             deployment.Spec.Template.Spec.Affinity != nil,
+			}
+			containerList = append(containerList, *ctn)
+		}
+	}
+
+	for _, c := range containerList {
+		logrus.Infof("%v", c)
+	}
+
+
 }
 
 func getClient(pathToCfg string) (*kubernetes.Clientset, error) {
@@ -31,5 +86,30 @@ func getClient(pathToCfg string) (*kubernetes.Clientset, error) {
 		return nil, err
 	}
 	return kubernetes.NewForConfig(config)
+}
 
+func getHelmMetadata(deployment *v1beta1.Deployment) (string, string) {
+	var chart string
+	var releaseName string
+
+	if deployment.Labels["app.kubernetes.io/chart"] != "" {
+		chart = deployment.Labels["app.kubernetes.io/chart"]
+	} else if deployment.Labels["app"] != "" {
+		chart = deployment.Labels["app"]
+	}
+
+	if deployment.Labels["app.kubernetes.io/instance"] != "" {
+		releaseName = deployment.Labels["app.kubernetes.io/instance"]
+	} else if deployment.Labels["release"] != "" {
+		releaseName = deployment.Labels["release"]
+	}
+
+	return chart, releaseName
+}
+
+func homeDir() string {
+	if h := os.Getenv("HOME"); h != "" {
+		return h
+	}
+	return os.Getenv("USERPROFILE") // windows
 }
