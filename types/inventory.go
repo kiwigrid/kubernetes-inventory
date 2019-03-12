@@ -3,18 +3,20 @@ package types
 import "fmt"
 
 type ContainerInventory struct {
-	DeploymentName       string
-	ContainerName        string
-	HelmReleaseName      string
-	HelmChart            string
-	ReplicaCount         int
-	Affinity             bool
-	PodDisruptionBudget  bool
-	UpdateStrategy       string
-	ResourceCpuRequested string
-	ResourceCpuLimit     string
-	ResourceMemRequested string
-	ResourceMemLimit     string
+	DeploymentName              string
+	ContainerName               string
+	HelmReleaseName             string
+	HelmChart                   string
+	ReplicaCount                int
+	Affinity                    bool
+	PodDisruptionBudget         bool
+	UpdateStrategy              string
+	RollingUpdateMaxSurge       string
+	RollingUpdateMaxUnavailable string
+	ResourceCpuRequested        string
+	ResourceCpuLimit            string
+	ResourceMemRequested        string
+	ResourceMemLimit            string
 }
 
 func (ci ContainerInventory) String() string {

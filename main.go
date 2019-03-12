@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/kiwigrid/kubernetes-inventory/pkg"
 	"github.com/kiwigrid/kubernetes-inventory/types"
@@ -63,19 +64,25 @@ func processResources(clientset *kubernetes.Clientset) []types.ContainerInventor
 			chart, rel := getHelmMetadata(&deployment)
 
 			ctn := &types.ContainerInventory{
-				ContainerName:        container.Name,
-				DeploymentName:       deployment.Name,
-				HelmChart:            chart,
-				HelmReleaseName:      rel,
-				ReplicaCount:         int(*deployment.Spec.Replicas),
-				ResourceCpuRequested: container.Resources.Requests.Cpu().String(),
-				ResourceMemRequested: container.Resources.Requests.Memory().String(),
-				ResourceCpuLimit:     container.Resources.Limits.Cpu().String(),
-				ResourceMemLimit:     container.Resources.Limits.Memory().String(),
-				UpdateStrategy:       deployment.Spec.Strategy.String(),
-				PodDisruptionBudget:  false,
-				Affinity:             deployment.Spec.Template.Spec.Affinity != nil,
+				ContainerName:               container.Name,
+				DeploymentName:              deployment.Name,
+				HelmChart:                   chart,
+				HelmReleaseName:             rel,
+				ReplicaCount:                int(*deployment.Spec.Replicas),
+				ResourceCpuRequested:        container.Resources.Requests.Cpu().String(),
+				ResourceMemRequested:        container.Resources.Requests.Memory().String(),
+				ResourceCpuLimit:            container.Resources.Limits.Cpu().String(),
+				ResourceMemLimit:            container.Resources.Limits.Memory().String(),
+				UpdateStrategy:              fmt.Sprintf("%v", deployment.Spec.Strategy.Type),
+				PodDisruptionBudget:         false,
+				Affinity:                    deployment.Spec.Template.Spec.Affinity != nil,
 			}
+
+			if deployment.Spec.Strategy.RollingUpdate != nil {
+				ctn.RollingUpdateMaxSurge = deployment.Spec.Strategy.RollingUpdate.MaxSurge.String()
+				ctn.RollingUpdateMaxUnavailable = deployment.Spec.Strategy.RollingUpdate.MaxUnavailable.String()
+			}
+
 			checkForPdb(podDisruptionBudgetList, ctn)
 			containerList = append(containerList, *ctn)
 		}
