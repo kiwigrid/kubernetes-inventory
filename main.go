@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 	"github.com/Sirupsen/logrus"
+	"github.com/kiwigrid/kubernetes-inventory/pkg"
 	"github.com/kiwigrid/kubernetes-inventory/types"
 	"k8s.io/api/extensions/v1beta1"
+	v1beta13 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -35,13 +37,27 @@ func main() {
 
 	// create the clientset
 	clientset, err := kubernetes.NewForConfig(config)
-	
-	deploymentList, _ := clientset.ExtensionsV1beta1().Deployments(namespace).List(metav1.ListOptions{})
 
-	containerList := []types.ContainerInventory{}
+	containerList := processResources(clientset)
+
+	pkg.WriteHeader(config)
+	for _, c := range containerList {
+		pkg.AppendInventoryItem(c)
+	}
+}
+
+func processResources(clientset *kubernetes.Clientset) []types.ContainerInventory {
+	deploymentList, _ := clientset.ExtensionsV1beta1().Deployments(namespace).List(metav1.ListOptions{})
+	podDisruptionBudgetList, _ := clientset.PolicyV1beta1().PodDisruptionBudgets(namespace).List(metav1.ListOptions{})
+
+	var containerList []types.ContainerInventory
 
 	for _, deployment := range deploymentList.Items {
-		//logrus.Infof("%v", deployment)
+
+		if deployment.Namespace == "kube-system" {
+			continue
+		}
+
 		for _, container := range deployment.Spec.Template.Spec.Containers {
 
 			chart, rel := getHelmMetadata(&deployment)
@@ -60,15 +76,28 @@ func main() {
 				PodDisruptionBudget:  false,
 				Affinity:             deployment.Spec.Template.Spec.Affinity != nil,
 			}
+			checkForPdb(podDisruptionBudgetList, ctn)
 			containerList = append(containerList, *ctn)
 		}
 	}
 
-	for _, c := range containerList {
-		logrus.Infof("%v", c)
+	return containerList
+}
+
+func checkForPdb(pdbList *v1beta13.PodDisruptionBudgetList, ci *types.ContainerInventory) {
+
+	if ci.HelmReleaseName == "" {
+		return
 	}
+	pdbMatches := false
+	for _, pdb := range pdbList.Items {
 
-
+		pdbMatches = pdb.Labels["release"] == ci.HelmReleaseName || pdb.Labels["app.kubernetes.io/instance"] == ci.HelmReleaseName
+		if pdbMatches {
+			break
+		}
+	}
+	ci.PodDisruptionBudget = pdbMatches
 }
 
 func getClient(pathToCfg string) (*kubernetes.Clientset, error) {
@@ -92,8 +121,8 @@ func getHelmMetadata(deployment *v1beta1.Deployment) (string, string) {
 	var chart string
 	var releaseName string
 
-	if deployment.Labels["app.kubernetes.io/chart"] != "" {
-		chart = deployment.Labels["app.kubernetes.io/chart"]
+	if deployment.Labels["helm.sh/chart"] != "" {
+		chart = deployment.Labels["helm.sh/chart"]
 	} else if deployment.Labels["app"] != "" {
 		chart = deployment.Labels["app"]
 	}

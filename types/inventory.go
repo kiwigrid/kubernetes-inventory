@@ -29,3 +29,7 @@ func (ci ContainerInventory) String() string {
 		", ResourceMemLimit='%s'"+
 		"}", ci.DeploymentName, ci.ContainerName, ci.HelmChart, ci.HelmReleaseName, ci.ResourceCpuRequested, ci.ResourceCpuLimit, ci.ResourceMemRequested, ci.ResourceMemLimit)
 }
+
+func (ci ContainerInventory) HasResourceConfig() bool {
+	return ci.ResourceMemLimit != "0" && ci.ResourceMemRequested != "0" && ci.ResourceCpuLimit != "0" && ci.ResourceCpuRequested != "0"
+}
