@@ -64,18 +64,19 @@ func processResources(clientset *kubernetes.Clientset) []types.ContainerInventor
 			chart, rel := getHelmMetadata(&deployment)
 
 			ctn := &types.ContainerInventory{
-				ContainerName:               container.Name,
-				DeploymentName:              deployment.Name,
-				HelmChart:                   chart,
-				HelmReleaseName:             rel,
-				ReplicaCount:                int(*deployment.Spec.Replicas),
-				ResourceCpuRequested:        container.Resources.Requests.Cpu().String(),
-				ResourceMemRequested:        container.Resources.Requests.Memory().String(),
-				ResourceCpuLimit:            container.Resources.Limits.Cpu().String(),
-				ResourceMemLimit:            container.Resources.Limits.Memory().String(),
-				UpdateStrategy:              fmt.Sprintf("%v", deployment.Spec.Strategy.Type),
-				PodDisruptionBudget:         false,
-				Affinity:                    deployment.Spec.Template.Spec.Affinity != nil,
+				ContainerName:        container.Name,
+				DeploymentName:       deployment.Name,
+				HelmChart:            chart,
+				HelmReleaseName:      rel,
+				ReplicaCount:         int(*deployment.Spec.Replicas),
+				ResourceCpuRequested: container.Resources.Requests.Cpu().String(),
+				ResourceMemRequested: container.Resources.Requests.Memory().String(),
+				ResourceCpuLimit:     container.Resources.Limits.Cpu().String(),
+				ResourceMemLimit:     container.Resources.Limits.Memory().String(),
+				UpdateStrategy:       fmt.Sprintf("%v", deployment.Spec.Strategy.Type),
+				PodDisruptionBudget:  false,
+				Affinity:             deployment.Spec.Template.Spec.Affinity != nil,
+				StandardHelmLabels:   hasHelmStandardLabels(&deployment),
 			}
 
 			if deployment.Spec.Strategy.RollingUpdate != nil {
@@ -105,6 +106,13 @@ func checkForPdb(pdbList *v1beta13.PodDisruptionBudgetList, ci *types.ContainerI
 		}
 	}
 	ci.PodDisruptionBudget = pdbMatches
+}
+
+func hasHelmStandardLabels(deployment *v1beta1.Deployment) bool {
+	return deployment.Labels["app.kubernetes.io/name"] != "" &&
+		deployment.Labels["helm.sh/chart"] != "" &&
+		deployment.Labels["app.kubernetes.io/managed-by"] != "" &&
+		deployment.Labels["app.kubernetes.io/instance"] != ""
 }
 
 func getClient(pathToCfg string) (*kubernetes.Clientset, error) {

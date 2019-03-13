@@ -17,6 +17,7 @@ type ContainerInventory struct {
 	ResourceCpuLimit            string
 	ResourceMemRequested        string
 	ResourceMemLimit            string
+	StandardHelmLabels			bool
 }
 
 func (ci ContainerInventory) String() string {

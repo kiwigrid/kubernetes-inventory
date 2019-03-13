@@ -21,8 +21,8 @@ func WriteHeader(config *rest.Config) {
 
 	user := fmt.Sprintf("%v", config.AuthConfigPersister)
 	f.WriteString("k8s context: " + strings.Split(user, " ")[1] + "\n\n")
-	f.WriteString("| Name | Container | HelmChart | HelmRelease | hasResourceConfig | hasPDB | UpdateStrategy |\n")
-	f.WriteString("|---|---|---|---|---|---|---|\n")
+	f.WriteString("| Name | Container | HelmChart | HelmRelease | hasResourceConfig | hasPDB | hasHelmStandardLabels | UpdateStrategy |\n")
+	f.WriteString("|---|---|---|---|---|---|---|---|\n")
 }
 
 func AppendInventoryItem(ci types.ContainerInventory) {
@@ -36,24 +36,26 @@ func AppendInventoryItem(ci types.ContainerInventory) {
 	var line string
 
 	if (ci.UpdateStrategy == "RollingUpdate") {
-		line = fmt.Sprintf("| %s | %s | %s | %s | %t | %t | %s (maxSurge: %s, maxUnavailable: %s)|\n",
+		line = fmt.Sprintf("| %s | %s | %s | %s | %t | %t | %t | %s (maxSurge: %s, maxUnavailable: %s)|\n",
 			ci.DeploymentName,
 			ci.ContainerName,
 			ci.HelmChart,
 			ci.HelmReleaseName,
 			ci.HasResourceConfig(),
 			ci.PodDisruptionBudget,
+			ci.StandardHelmLabels,
 			ci.UpdateStrategy,
 			ci.RollingUpdateMaxSurge,
 			ci.RollingUpdateMaxUnavailable)
 	} else {
-		line = fmt.Sprintf("| %s | %s | %s | %s | %t | %t | %s |\n",
+		line = fmt.Sprintf("| %s | %s | %s | %s | %t | %t | %t | %s |\n",
 			ci.DeploymentName,
 			ci.ContainerName,
 			ci.HelmChart,
 			ci.HelmReleaseName,
 			ci.HasResourceConfig(),
 			ci.PodDisruptionBudget,
+			ci.StandardHelmLabels,
 			ci.UpdateStrategy)
 
 	}
