@@ -36,3 +36,7 @@ func (ci ContainerInventory) String() string {
 func (ci ContainerInventory) HasResourceConfig() bool {
 	return ci.ResourceMemLimit != "0" && ci.ResourceMemRequested != "0" && ci.ResourceCpuLimit != "0" && ci.ResourceCpuRequested != "0"
 }
+
+func (ci ContainerInventory) GetResourceConfigString() string {
+	return fmt.Sprintf("CPU req/limit: %s/%s - Mem req/limit: %s/%s", ci.ResourceCpuRequested, ci.ResourceCpuLimit, ci.ResourceMemRequested, ci.ResourceMemLimit)
+}
